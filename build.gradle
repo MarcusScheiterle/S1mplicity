@@ -34,7 +34,7 @@ jar {
     from {
         configurations.includedDependencies.collect { it.isDirectory() ? it : zipTree(it) }
     }
-    archiveName = "app.jar"
+    archiveFileName = "app.jar"
 }
 
 task stage(dependsOn: ['build'])
