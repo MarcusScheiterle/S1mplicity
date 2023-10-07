@@ -12,16 +12,27 @@ import java.time.Instant;
 
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.channel.Channel;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
 
 public class DatabaseManager {
     private static Connection connection;
 
     public DatabaseManager(String databasePath) {
         try {
+            System.out.println(databasePath);
             connection = DriverManager.getConnection("jdbc:sqlite:" + databasePath);
-
-            if (!doesTableExist("users")) {
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return; // Exit if there's a problem establishing the connection.
+        }
+        
+        try {
+            if (connection == null || connection.isClosed() || !doesTableExist("users")) {
                 createTables();
                 System.out.println("Tables Created");
             }
@@ -81,6 +92,8 @@ public class DatabaseManager {
                 insertStatement.setString(6, null);
                 insertStatement.executeUpdate();
             }
+        } catch (NullPointerException nullE) {
+            createTables();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -154,7 +167,7 @@ public class DatabaseManager {
                 System.out.println(String.format("Points and Level Updated - User: %s Points: %d Level: %d", userId,
                         newPoints, newLevel));
 
-                Callables.handleLevelUp(member, guild, channel);
+                handleLevelUp(member, guild, channel);
             } catch (SQLException e) {
                 e.printStackTrace();
             } catch (Exception e) {
@@ -174,6 +187,74 @@ public class DatabaseManager {
         }
     }
 
+    public static void handleLevelUp(Member member, Guild guild, Channel channel) {
+
+        // Assign varibales
+        int currentLevel = DatabaseManager.getLevel(member.getId());
+        String generalRoleName = Levels.getLevelName(currentLevel);
+
+        // Check for nonnulls
+        if (member == null || guild == null) {
+            return;
+        }
+
+        Callables.levelRoleChange(member, guild, currentLevel);
+
+        if (currentLevel % 10 != 0) {
+            return;
+        }
+
+        // Build Embed
+        EmbedBuilder embedBuilder = new EmbedBuilder()
+                .setThumbnail(member.getEffectiveAvatarUrl())
+                .setDescription(
+                        member.getAsMention() + " Bigger number, Better Person! You are now a **" + generalRoleName
+                                + "**")
+                .setFooter("S1mplicity", member.getJDA().getSelfUser().getEffectiveAvatarUrl())
+                .setTitle("Congratulations " + member.getEffectiveName() + ", you've tierd up!")
+                .setColor(0x42F56C);
+
+        // Main section for prestige or normal level up
+        Button prestigeButton = null;
+
+        try {
+            int pointsNeededForNextLevel = Levels.calculateLevelPointsMap().get(currentLevel + 1)
+                    - Levels.calculateLevelPointsMap().get(currentLevel);
+            embedBuilder.addField("Current Level", "" + String.valueOf(currentLevel), true)
+                    .addField("Next Level", "" + String.valueOf(currentLevel + 1), true)
+                    .addField("Points Needed for Next Level", "" + String.valueOf(pointsNeededForNextLevel), true);
+        } catch (NullPointerException e) {
+            prestigeButton = Button.primary("prestige_button", "Prestige Me!");
+
+            int currentPrestige = DatabaseManager.getPrestige(member.getId());
+            embedBuilder.addField("Current Level", "" + String.valueOf(currentLevel), true)
+                    .addField("Next Prestige", "" + String.valueOf(currentPrestige + 1), true)
+                    .setDescription(member.getAsMention() + " You can now prestige and reset your level!");
+        }
+
+        MessageEmbed embed = embedBuilder.build();
+
+        // Send message
+        if (channel != null) {
+            if (prestigeButton != null) {
+                ((MessageChannel) channel).sendMessageEmbeds(embed).addActionRow(prestigeButton).queue();
+            } else {
+                ((MessageChannel) channel).sendMessageEmbeds(embed).queue();
+            }
+        } else {
+            MessageChannel targetChannel = member.getJDA().getTextChannelById("1024458153196273775");
+            if (targetChannel != null) {
+                if (prestigeButton != null) {
+                    targetChannel.sendMessageEmbeds(embed).addActionRow(prestigeButton).queue();
+                } else {
+                    targetChannel.sendMessageEmbeds(embed).queue();
+                }
+            } else {
+                System.out.println("Target channel not found!");
+            }
+        }
+    }
+
     public static void setPrestige(Member member, Guild guild, Channel channel, int newPrestige) {
         try {
 
@@ -186,7 +267,7 @@ public class DatabaseManager {
             preparedStatement.executeUpdate();
 
             if (newPrestige > previousPrestige) {
-                Callables.handlePrestige(member, guild, channel, newPrestige);
+                handlePrestige(member, guild, channel, newPrestige);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -204,9 +285,63 @@ public class DatabaseManager {
             preparedStatement.setString(2, member.getId());
             preparedStatement.executeUpdate();
 
-            Callables.handlePrestige(member, guild, channel, newPrestige);
+            handlePrestige(member, guild, channel, newPrestige);
         } catch (SQLException e) {
             e.printStackTrace();
+        }
+    }
+
+    public static void handlePrestige(Member member, Guild guild, Channel channel, int currentPrestige) {
+        // Create an embed message
+        EmbedBuilder embedBuilder = new EmbedBuilder()
+                .setThumbnail(member.getEffectiveAvatarUrl())
+                .setFooter("S1mplicity", member.getJDA().getSelfUser().getEffectiveAvatarUrl())
+                .setTitle("Congratulations " + member.getEffectiveName() + ", you've Prestiged!")
+                .setDescription("@here " + member.getAsMention() + " Is now Prestige " + currentPrestige + "!")
+                .setColor(0x42F56C);
+
+        if (member == null || guild == null) {
+            return;
+        }
+
+        int currentLevel = DatabaseManager.getLevel(member.getId());
+        Button prestigeButton = null;
+
+        try {
+            int pointsNeededForNextLevel = Levels.calculateLevelPointsMap().get(currentLevel + 1)
+                    - Levels.calculateLevelPointsMap().get(currentLevel);
+            embedBuilder.addField("Current Level", "" + String.valueOf(currentLevel), true)
+                    .addField("Next Level", "" + String.valueOf(currentLevel + 1), true)
+                    .addField("Points Needed for Next Level", "" + String.valueOf(pointsNeededForNextLevel), true);
+        } catch (NullPointerException e) {
+            prestigeButton = Button.primary("prestige_button", "Prestige Me!");
+
+            embedBuilder.addField("Current Level", "" + String.valueOf(currentLevel), true)
+                    .addField("Next Prestige", "" + String.valueOf(currentPrestige + 1), true)
+                    .setDescription(member.getAsMention() + " You can now prestige and reset your level!");
+        }
+
+        Callables.levelRoleChange(member, guild, currentLevel);
+
+        MessageEmbed embed = embedBuilder.build();
+
+        if (channel != null) {
+            if (prestigeButton != null) {
+                ((MessageChannel) channel).sendMessageEmbeds(embed).addActionRow(prestigeButton).queue();
+            } else {
+                ((MessageChannel) channel).sendMessageEmbeds(embed).queue();
+            }
+        } else {
+            MessageChannel targetChannel = member.getJDA().getTextChannelById("1024458153196273775");
+            if (targetChannel != null) {
+                if (prestigeButton != null) {
+                    targetChannel.sendMessageEmbeds(embed).addActionRow(prestigeButton).queue();
+                } else {
+                    targetChannel.sendMessageEmbeds(embed).queue();
+                }
+            } else {
+                System.out.println("Target channel not found!");
+            }
         }
     }
 
