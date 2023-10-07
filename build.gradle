@@ -34,14 +34,7 @@ jar {
     from {
         configurations.includedDependencies.collect { it.isDirectory() ? it : zipTree(it) }
     }
+    archiveName = "app.jar"
 }
 
-task stage(dependsOn: ['build', 'clean']) {
-    doLast {
-        javaexec {
-            main = 'simpl1f1ed.bot.App'
-            classpath = sourceSets.main.runtimeClasspath
-            args = [] // Add any arguments you want to pass to your application
-        }
-    }
-}
+task stage(dependsOn: ['build'])
