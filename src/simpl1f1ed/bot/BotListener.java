@@ -35,7 +35,7 @@ public class BotListener extends ListenerAdapter {
         this.databaseManager = databaseManager;
     }
 
-    public void onGuildVoiceUpdate(@Nonnull GuildVoiceUpdateEvent event) {
+    public void onGuildVoiceUpdate(GuildVoiceUpdateEvent event) {
         Member member = event.getEntity();
         AudioChannel oldValue = event.getOldValue();
         AudioChannel newValue = event.getNewValue();
@@ -82,7 +82,7 @@ public class BotListener extends ListenerAdapter {
         int points = calculatePoints(secondsSpent);
         // Assume the databaseManager.incrementUserPoints method takes `points` as an
         // argument
-        DatabaseManager.incrementUserPoints(member, event.getGuild(), null, points, 0);
+        databaseManager.incrementUserPoints(member, event.getGuild(), null, points, 0);
         return secondsSpent;
     }
 
@@ -91,15 +91,15 @@ public class BotListener extends ListenerAdapter {
     }
 
     @Override
-    public void onMessageReceived(@Nonnull MessageReceivedEvent event) {
+    public void onMessageReceived(MessageReceivedEvent event) {
         if (!event.getAuthor().isBot()) {
-            DatabaseManager.incrementUserPoints(event.getMember(), event.getGuild(), event.getChannel(), 1, 1);
+            databaseManager.incrementUserPoints(event.getMember(), event.getGuild(), event.getChannel(), 1, 1);
             databaseManager.lastMessageUpdate(event.getAuthor().getId());
         }
     }
 
     @Override
-    public void onButtonInteraction(@Nonnull ButtonInteractionEvent event) {
+    public void onButtonInteraction(ButtonInteractionEvent event) {
 
         Member member = event.getMember();
 
@@ -109,7 +109,7 @@ public class BotListener extends ListenerAdapter {
                 return;
             }
 
-            if (DatabaseManager.getLevel(member.getId()) >= 100) {
+            if (databaseManager.getLevel(member.getId()) >= 100) {
                 Callables.prestige(member, event.getGuild(), event.getChannel());
             } else {
                 event.reply("You are not able to prestige...").setEphemeral(true).queue();
@@ -118,7 +118,7 @@ public class BotListener extends ListenerAdapter {
     }
 
     @Override
-    public void onSlashCommandInteraction(@Nonnull SlashCommandInteractionEvent event) {
+    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         String interactionCommand = event.getName();
         Member member = event.getMember();
 
@@ -164,7 +164,7 @@ public class BotListener extends ListenerAdapter {
 
                     Member mentionedMember = memberOption.getAsMember();
 
-                    Callables.handleLevelUp(mentionedMember, event.getGuild(), event.getChannel());
+                    databaseManager.handleLevelUp(mentionedMember, event.getGuild(), event.getChannel());
                     event.getHook().sendMessage("Test command executed").setEphemeral(true)
                             .queue();
                 }
@@ -185,7 +185,7 @@ public class BotListener extends ListenerAdapter {
                     int points = Callables.calculateTimeDifferenceInMinutes(start, end);
                     Member mentionedMember = memberOption.getAsMember();
 
-                    DatabaseManager.incrementUserPoints(mentionedMember, event.getGuild(), event.getChannel(), points,
+                    databaseManager.incrementUserPoints(mentionedMember, event.getGuild(), event.getChannel(), points,
                             0);
                     event.getHook().sendMessage("Points assigned").setEphemeral(true)
                             .queue();
@@ -207,7 +207,7 @@ public class BotListener extends ListenerAdapter {
                         return;
                     }
 
-                    DatabaseManager.updatePointsAndLevel(mentionedMember, event.getGuild(), event.getChannel(), points);
+                    databaseManager.updatePointsAndLevel(mentionedMember, event.getGuild(), event.getChannel(), points);
                     event.getHook().sendMessage(mentionedMember.getAsMention() + " Points were set to: " + points)
                             .setEphemeral(true)
                             .queue();
@@ -230,7 +230,7 @@ public class BotListener extends ListenerAdapter {
                         return;
                     }
 
-                    DatabaseManager.incrementUserPoints(mentionedMember, event.getGuild(), event.getChannel(), points,
+                    databaseManager.incrementUserPoints(mentionedMember, event.getGuild(), event.getChannel(), points,
                             0);
                     event.getHook().sendMessage(points + " were added to: " + mentionedMember.getAsMention())
                             .setEphemeral(true)
@@ -261,7 +261,7 @@ public class BotListener extends ListenerAdapter {
     }
 
     @Override
-    public void onReady(@Nonnull ReadyEvent event) {
+    public void onReady(ReadyEvent event) {
         event.getJDA().getGuilds().forEach(guild -> {
             guild.updateCommands().addCommands(
                     Commands.slash("getlevels", "Get a list of all the levels and the points needed to get them.")
