@@ -1,7 +1,8 @@
 package simpl1f1ed.bot;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -22,56 +23,22 @@ public class DatabaseManager {
     private static Connection connection;
 
     public DatabaseManager(String databasePath) {
-        try {
-            // Correct JDBC URL format for PostgreSQL
-            String url = "jdbc:postgresql://ec2-3-230-24-12.compute-1.amazonaws.com:5432/d1ibn3f2moidob";
-            String user = "tifixlhxucmnys";
-            String password = "e1621b727a8aaa257e6622c6a0b103bdd0561e929354937101077b3ff46d5ada";
-
-            connection = DriverManager.getConnection(url, user, password);
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return; // Exit if there's a problem establishing the connection.
-        }
-        
-        try {
-            if (connection == null || connection.isClosed() || !doesTableExist("users")) {
-                createTables();
-                System.out.println("Tables Created");
-            }
-        } catch (SQLException e) {
+        try (Connection connection = getConnection()) {
+            // Your database interaction code here
+        } catch (SQLException | URISyntaxException e) {
+            // Handle exceptions
             e.printStackTrace();
         }
     }
 
-    private boolean doesTableExist(String tableName) {
-        try {
-            DatabaseMetaData metaData = connection.getMetaData();
-            ResultSet resultSet = metaData.getTables(null, null, tableName, null);
-            return resultSet.next();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
+    private static Connection getConnection() throws URISyntaxException, SQLException {
+        URI dbUri = new URI(System.getenv("DATABASE_URL"));
 
-    private void createTables() {
-        try {
-            String createUserTable = "CREATE TABLE IF NOT EXISTS users (" +
-                    "id TEXT PRIMARY KEY," +
-                    "username TEXT," +
-                    "nickname TEXT," +
-                    "roles TEXT," +
-                    "points INTEGER DEFAULT 0," +
-                    "level INTEGER DEFAULT 0," +
-                    "prestige INTEGER DEFAULT 0," +
-                    "last_message_timestamp TIMESTAMP DEFAULT null," +
-                    "admin INTEGER DEFAULT 0" +
-                    ")";
-            connection.createStatement().executeUpdate(createUserTable);
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        String username = dbUri.getUserInfo().split(":")[0];
+        String password = dbUri.getUserInfo().split(":")[1];
+        String dbUrl = "jdbc:postgresql://" + dbUri.getHost() + ':' + dbUri.getPort() + dbUri.getPath() + "?sslmode=require";
+
+        return DriverManager.getConnection(dbUrl, username, password);
     }
 
     public void upsertUser(String id, String username, String nickname, String roles) {
@@ -95,8 +62,6 @@ public class DatabaseManager {
                 insertStatement.setNull(6, java.sql.Types.TIMESTAMP);
                 insertStatement.executeUpdate();
             }
-        } catch (NullPointerException nullE) {
-            createTables();
         } catch (SQLException e) {
             e.printStackTrace();
         }
