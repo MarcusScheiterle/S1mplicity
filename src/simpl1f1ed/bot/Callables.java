@@ -15,6 +15,7 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import net.dv8tion.jda.api.requests.restaction.RoleAction;
 
 public class Callables {
+    private static DatabaseManager databaseManager = new DatabaseManager();
 
     public static void levelRoleChange(Member member, Guild guild, int currentLevel) {
         if (member == null || guild == null) {
@@ -59,8 +60,8 @@ public class Callables {
     }
 
     public static void prestige(Member member, Guild guild, Channel channel) {
-        DatabaseManager.updatePointsAndLevel(member, guild, channel, 0);
-        DatabaseManager.incrementPrestige(member, guild, channel);
+        databaseManager.updatePointsAndLevel(member, guild, channel, 0);
+        databaseManager.incrementPrestige(member, guild, channel);
     }
 
     public static void createLevelRoles(SlashCommandInteractionEvent event) {

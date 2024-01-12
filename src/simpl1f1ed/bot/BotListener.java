@@ -7,6 +7,7 @@ import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
+import net.dv8tion.jda.api.events.session.ShutdownEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
@@ -26,14 +27,12 @@ import java.util.TimerTask;
 import java.util.List;
 
 public class BotListener extends ListenerAdapter {
-    private DatabaseManager databaseManager;
+    private static DatabaseManager databaseManager = new DatabaseManager();
 
     private Map<String, Instant> voiceJoinTimeMap = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Timer> memberTimers = new ConcurrentHashMap<>();
 
-    public BotListener(DatabaseManager databaseManager) {
-        this.databaseManager = databaseManager;
-    }
+    public BotListener() {}
 
     public void onGuildVoiceUpdate(GuildVoiceUpdateEvent event) {
         Member member = event.getEntity();
@@ -258,6 +257,12 @@ public class BotListener extends ListenerAdapter {
             event.getHook().sendMessage("An error occured and I could not process your command.").setEphemeral(true)
                     .queue();
         }
+    }
+
+    @Override
+    public void onShutdown(ShutdownEvent event) {
+        System.out.println("Shutting down...\nRemoving connection...");
+        databaseManager.closeConnection();
     }
 
     @Override

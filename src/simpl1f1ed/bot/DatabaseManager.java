@@ -7,6 +7,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -22,23 +23,53 @@ import net.dv8tion.jda.api.interactions.components.buttons.Button;
 public class DatabaseManager {
     private static Connection connection;
 
-    public DatabaseManager(String databasePath) {
-        try (Connection connection = getConnection()) {
-            // Your database interaction code here
-        } catch (SQLException | URISyntaxException e) {
-            // Handle exceptions
+    public DatabaseManager() {
+        try {
+            connection = getConnection();
+            initializeDatabase();
+        } catch (SQLException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (URISyntaxException e) {
+            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }
 
-    private static Connection getConnection() throws URISyntaxException, SQLException {
-        URI dbUri = new URI(System.getenv("DATABASE_URL"));
+    private static Connection getConnection() throws SQLException, URISyntaxException {
+        String databaseUrl = System.getenv("DATABASE_URL");
+        if (databaseUrl == null) {
+            throw new SQLException("DATABASE_URL not set in the environment variables");
+        }
+
+        URI dbUri = new URI(databaseUrl);
 
         String username = dbUri.getUserInfo().split(":")[0];
         String password = dbUri.getUserInfo().split(":")[1];
         String dbUrl = "jdbc:postgresql://" + dbUri.getHost() + ':' + dbUri.getPort() + dbUri.getPath() + "?sslmode=require";
 
         return DriverManager.getConnection(dbUrl, username, password);
+    }
+
+    private void initializeDatabase() {
+        String createTableSQL = "CREATE TABLE IF NOT EXISTS users (" +
+                                "id VARCHAR(255) PRIMARY KEY, " +
+                                "username VARCHAR(255), " +
+                                "nickname VARCHAR(255), " +
+                                "roles VARCHAR(255), " +
+                                "level INTEGER, " +
+                                "last_message_timestamp TIMESTAMP, " +
+                                "points INTEGER, " +
+                                "prestige INTEGER, " +
+                                "admin INTEGER" +
+                                ");";
+
+        try (Statement statement = connection.createStatement()) {
+            statement.execute(createTableSQL);
+            System.out.println("Checked/created 'users' table successfully.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     public void upsertUser(String id, String username, String nickname, String roles) {
@@ -67,7 +98,7 @@ public class DatabaseManager {
         }
     }
 
-    public static int getUserPoints(String userId) {
+    public int getUserPoints(String userId) {
         int points = 0;
         try {
             String selectPointsQuery = "SELECT points FROM users WHERE id = ?";
@@ -84,7 +115,7 @@ public class DatabaseManager {
         return points;
     }
 
-    public static void incrementUserPoints(Member member, Guild guild, Channel channel, int pointsToAdd, int reasonCode) {
+    public void incrementUserPoints(Member member, Guild guild, Channel channel, int pointsToAdd, int reasonCode) {
         try {
             String checkTimestampQuery = "SELECT last_message_timestamp FROM users WHERE id = ?";
             PreparedStatement timestampStatement = connection.prepareStatement(checkTimestampQuery);
@@ -117,7 +148,7 @@ public class DatabaseManager {
         }
     }
 
-    public static void updatePointsAndLevel(Member member, Guild guild, Channel channel, int newPoints) {
+    public void updatePointsAndLevel(Member member, Guild guild, Channel channel, int newPoints) {
 
         String userId = member.getId();
 
@@ -155,10 +186,10 @@ public class DatabaseManager {
         }
     }
 
-    public static void handleLevelUp(Member member, Guild guild, Channel channel) {
+    public void handleLevelUp(Member member, Guild guild, Channel channel) {
 
         // Assign varibales
-        int currentLevel = DatabaseManager.getLevel(member.getId());
+        int currentLevel = getLevel(member.getId());
         String generalRoleName = Levels.getLevelName(currentLevel);
 
         // Check for nonnulls
@@ -194,7 +225,7 @@ public class DatabaseManager {
         } catch (NullPointerException e) {
             prestigeButton = Button.primary("prestige_button", "Prestige Me!");
 
-            int currentPrestige = DatabaseManager.getPrestige(member.getId());
+            int currentPrestige = getPrestige(member.getId());
             embedBuilder.addField("Current Level", "" + String.valueOf(currentLevel), true)
                     .addField("Next Prestige", "" + String.valueOf(currentPrestige + 1), true)
                     .setDescription(member.getAsMention() + " You can now prestige and reset your level!");
@@ -223,7 +254,7 @@ public class DatabaseManager {
         }
     }
 
-    public static void setPrestige(Member member, Guild guild, Channel channel, int newPrestige) {
+    public void setPrestige(Member member, Guild guild, Channel channel, int newPrestige) {
         try {
 
             int previousPrestige = getPrestige(member.getId());
@@ -242,7 +273,7 @@ public class DatabaseManager {
         }
     }
 
-    public static void incrementPrestige(Member member, Guild guild, Channel channel) {
+    public void incrementPrestige(Member member, Guild guild, Channel channel) {
         try {
             int currentPrestige = getPrestige(member.getId());
             int newPrestige = currentPrestige + 1;
@@ -259,7 +290,7 @@ public class DatabaseManager {
         }
     }
 
-    public static void handlePrestige(Member member, Guild guild, Channel channel, int currentPrestige) {
+    public void handlePrestige(Member member, Guild guild, Channel channel, int currentPrestige) {
         // Create an embed message
         EmbedBuilder embedBuilder = new EmbedBuilder()
                 .setThumbnail(member.getEffectiveAvatarUrl())
@@ -272,7 +303,7 @@ public class DatabaseManager {
             return;
         }
 
-        int currentLevel = DatabaseManager.getLevel(member.getId());
+        int currentLevel = getLevel(member.getId());
         Button prestigeButton = null;
 
         try {
@@ -313,7 +344,7 @@ public class DatabaseManager {
         }
     }
 
-    public static int getLevel(String userId) {
+    public int getLevel(String userId) {
         int level = 0;
         try {
             String selectLevelQuery = "SELECT level FROM users WHERE id = ?";
@@ -330,7 +361,7 @@ public class DatabaseManager {
         return level;
     }
 
-    public static int getPrestige(String userId) {
+    public int getPrestige(String userId) {
         int prestige = 0;
         try {
             String selectPrestigeQuery = "SELECT prestige FROM users WHERE id = ?";
@@ -376,5 +407,16 @@ public class DatabaseManager {
             e.printStackTrace();
         }
         return false;
+    }
+
+    // Make sure to close the connection when it is no longer needed
+    public void closeConnection() {
+        try {
+            if (connection != null && !connection.isClosed()) {
+                connection.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 }
