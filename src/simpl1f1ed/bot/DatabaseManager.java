@@ -13,7 +13,6 @@ import java.time.Instant;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
@@ -24,8 +23,12 @@ public class DatabaseManager {
 
     public DatabaseManager(String databasePath) {
         try {
-            System.out.println(databasePath);
-            connection = DriverManager.getConnection("jdbc:sqlite:" + databasePath);
+            // Correct JDBC URL format for PostgreSQL
+            String url = "jdbc:postgresql://ec2-3-230-24-12.compute-1.amazonaws.com:5432/d1ibn3f2moidob";
+            String user = "tifixlhxucmnys";
+            String password = "e1621b727a8aaa257e6622c6a0b103bdd0561e929354937101077b3ff46d5ada";
+
+            connection = DriverManager.getConnection(url, user, password);
         } catch (SQLException e) {
             e.printStackTrace();
             return; // Exit if there's a problem establishing the connection.
@@ -89,7 +92,7 @@ public class DatabaseManager {
                 insertStatement.setString(3, nickname);
                 insertStatement.setString(4, roles);
                 insertStatement.setInt(5, 0);
-                insertStatement.setString(6, null);
+                insertStatement.setNull(6, java.sql.Types.TIMESTAMP);
                 insertStatement.executeUpdate();
             }
         } catch (NullPointerException nullE) {

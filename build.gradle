@@ -15,7 +15,9 @@ configurations {
 
 dependencies {
     includedDependencies files('libs/JDA-5.0.0-beta.13-withDependencies.jar')
-    includedDependencies files('libs/sqlite-jdbc-3.43.0.0.jar')
+
+    // https://mvnrepository.com/artifact/org.postgresql/postgresql
+    includedDependencies files('libs/postgresql-42.7.1.jar')
 }
 
 sourceSets {
